@@ -15,6 +15,22 @@ import BluetoothSearchingRoundedIcon from "@mui/icons-material/BluetoothSearchin
 import BluetoothDisabledRoundedIcon from "@mui/icons-material/BluetoothDisabled";
 
 const MyChart = ({ data }) => {
+  /* useEffect(() => { */
+  /* setState([...data]); */
+  /* }, data); */
+  /* useEffect(() => {
+   *   const timer = setInterval(() => {
+   *     const current = new Date();
+   *     const diff = Math.floor((current - startDate) / 1000).toString();
+   *     if (diff > 600) return;
+   *     const r = Math.floor(Math.random() * 101);
+   *     const prevState = state;
+   *     prevState[diff] = { name: diff, power: r };
+   *     setState([...prevState]);
+   *   }, 1000);
+   *   return () => clearInterval(timer);
+   * }, []);
+   */
   return (
     <ResponsiveContainer height={"100%"} width={"100%"} aspect={3}>
       <LineChart
@@ -33,17 +49,29 @@ const MyChart = ({ data }) => {
         <YAxis />
         <Tooltip />
         <Legend />
-        <Line type="monotone" dataKey="power" stroke="#82ca9d" />
+        <Line type="monotone" dataKey="power" stroke="red" strokeWidth={3} />
       </LineChart>
     </ResponsiveContainer>
   );
 };
 
 function App() {
-  const startDate = new Date();
+  let startDate;
   const [supportsBluetooth, setSupportsBluetooth] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [data, setData] = useState([]);
+
+  const initConnection = () => {
+    console.log("called");
+    startDate = new Date();
+    const initData = [];
+    for (let i = 0; i < 600; i++) {
+      initData[i] = { name: i.toString() };
+    }
+    setData(initData);
+    /* setIsConnected(true); */
+  };
+
   // When the component mounts, check that the browser supports Bluetooth
   useEffect(() => {
     if (navigator.bluetooth) {
@@ -76,11 +104,13 @@ function App() {
       if (diff > 600) return;
       const prevState = data;
       prevState[diff] = { name: diff, power: val };
+      console.log(prevState);
       setData([...prevState]);
 
       /* setBatteryLevel(val); */
     };
 
+    initConnection();
     const server = await device.gatt.connect();
 
     // Get the battery service from the Bluetooth device
