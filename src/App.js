@@ -14,32 +14,13 @@ import { Button, Alert } from "@mui/material";
 import BluetoothSearchingRoundedIcon from "@mui/icons-material/BluetoothSearching";
 import BluetoothDisabledRoundedIcon from "@mui/icons-material/BluetoothDisabled";
 
-const MyChart = () => {
-  const startDate = new Date();
-  const initData = [];
-  for (let i = 0; i < 600; i++) {
-    initData[i] = { name: i.toString() };
-  }
-  const [state, setState] = useState(initData);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const current = new Date();
-      const diff = Math.floor((current - startDate) / 1000).toString();
-      if (diff > 600) return;
-      const r = Math.floor(Math.random() * 101);
-      const prevState = state;
-      prevState[diff] = { name: diff, power: r };
-      setState([...prevState]);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
+const MyChart = ({ data }) => {
   return (
     <ResponsiveContainer height={"100%"} width={"100%"} aspect={3}>
       <LineChart
         width={500}
         height={300}
-        data={state}
+        data={data}
         margin={{
           top: 5,
           right: 30,
@@ -59,8 +40,10 @@ const MyChart = () => {
 };
 
 function App() {
+  const startDate = new Date();
   const [supportsBluetooth, setSupportsBluetooth] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [data, setData] = useState([]);
   // When the component mounts, check that the browser supports Bluetooth
   useEffect(() => {
     if (navigator.bluetooth) {
@@ -79,6 +62,47 @@ function App() {
     });
 
     setIsConnected(true);
+
+    device.addEventListener("gattserverdisconnected", () =>
+      setIsConnected(false)
+    );
+
+    const handleCharacteristicValueChanged = (event) => {
+      let dataview = new DataView(event.target.value.buffer);
+      const val = dataview.getUint16(2, dataview, true);
+
+      const current = new Date();
+      const diff = Math.floor((current - startDate) / 1000).toString();
+      if (diff > 600) return;
+      const prevState = data;
+      prevState[diff] = { name: diff, power: val };
+      setData([...prevState]);
+
+      /* setBatteryLevel(val); */
+    };
+
+    const server = await device.gatt.connect();
+
+    // Get the battery service from the Bluetooth device
+    const service = await server.getPrimaryService(
+      "00001818-0000-1000-8000-00805f9b34fb"
+    );
+    /* const chars = await service.getCharacteristics(); */
+    /* console.log(chars); */
+
+    // Get the battery level characteristic from the Bluetooth device
+    const characteristic = await service.getCharacteristic(
+      "00002a63-0000-1000-8000-00805f9b34fb"
+    );
+
+    // Subscribe to battery level notifications
+    characteristic.startNotifications();
+
+    // When the battery level changes, call a function
+    characteristic.addEventListener(
+      "characteristicvaluechanged",
+      handleCharacteristicValueChanged
+    );
   };
 
   return (
@@ -101,7 +125,7 @@ function App() {
       )}
       {supportsBluetooth && isConnected && (
         <div>
-          <MyChart />
+          <MyChart data={data} />
           <Button
             onClick={() => setIsConnected(false)}
             variant="contained"
