@@ -13,6 +13,8 @@ import {
 import { Button, Alert } from "@mui/material";
 import BluetoothSearchingRoundedIcon from "@mui/icons-material/BluetoothSearching";
 import BluetoothDisabledRoundedIcon from "@mui/icons-material/BluetoothDisabled";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import Stack from "@mui/material/Stack";
 
 const MyChart = ({ data }) => {
   return (
@@ -44,14 +46,22 @@ const Main = ({ data, disconnect, start }) => {
   return (
     <div>
       <MyChart data={data} />
-      <Button onClick={() => start()}>Start </Button>
-      <Button
-        onClick={() => disconnect()}
-        variant="contained"
-        startIcon={<BluetoothDisabledRoundedIcon />}
-      >
-        Disconnect
-      </Button>
+      <Stack direction="row" spacing={2}>
+        <Button
+          onClick={() => start()}
+          startIcon={<PlayArrowIcon />}
+          variant="contained"
+        >
+          Start{" "}
+        </Button>
+        <Button
+          onClick={() => disconnect()}
+          variant="contained"
+          startIcon={<BluetoothDisabledRoundedIcon />}
+        >
+          Disconnect
+        </Button>
+      </Stack>
     </div>
   );
 };
@@ -185,7 +195,10 @@ function App() {
       {supportsBluetooth && isConnected && (
         <Main
           data={state.data}
-          disconnect={() => setIsConnected(false)}
+          disconnect={() => {
+            setState({});
+            setIsConnected(false);
+          }}
           start={() => {
             setStart(true);
           }}
