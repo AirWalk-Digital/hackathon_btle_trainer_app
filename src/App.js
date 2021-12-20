@@ -50,25 +50,27 @@ const MyChart = ({ data }) => {
         <Tooltip />
         <Legend />
         <Line type="monotone" dataKey="power" stroke="red" strokeWidth={3} />
+        <Line type="monotone" dataKey="target" stroke="green" strokeWidth={3} />
       </LineChart>
     </ResponsiveContainer>
   );
 };
 
 function App() {
-  let startDate;
   const [supportsBluetooth, setSupportsBluetooth] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [data, setData] = useState([]);
+  const [startDate, setStartDate] = useState();
 
-  const initConnection = () => {
-    console.log("called");
-    startDate = new Date();
+  const initData = (inData) => {
+    /* console.log(inData); */
+    /* if (inData.length > 0) return inData; */
     const initData = [];
     for (let i = 0; i < 600; i++) {
       initData[i] = { name: i.toString() };
     }
-    setData(initData);
+    return initData;
+    /* setData(initData); */
     /* setIsConnected(true); */
   };
 
@@ -77,6 +79,34 @@ function App() {
     if (navigator.bluetooth) {
       setSupportsBluetooth(true);
     }
+  }, []);
+
+  const plan = [
+    { interval: 20, target: 100 },
+    { interval: 20, target: 150 },
+    { interval: 20, target: 200 },
+  ];
+
+  useEffect(() => {
+    if (data.length != 0) return;
+
+    const initData = [];
+
+    let outer = 0;
+    plan.forEach((p) => {
+      for (let i = 0; i < p.interval; i++) {
+        initData[outer + i] = { name: i.toString(), target: p.target };
+      }
+      outer = outer + p.interval;
+    });
+
+    console.log(initData);
+    /* for (let i = 0; i < 600; i++) { */
+    /* initData[i] = { name: i.toString() }; */
+    /* } */
+    const dt = new Date();
+    setData(initData);
+    setStartDate(dt);
   }, []);
 
   const connectToDeviceAndSubscribeToUpdates = async () => {
@@ -90,6 +120,7 @@ function App() {
     });
 
     setIsConnected(true);
+    /* initConnection(); */
 
     device.addEventListener("gattserverdisconnected", () =>
       setIsConnected(false)
@@ -98,19 +129,21 @@ function App() {
     const handleCharacteristicValueChanged = (event) => {
       let dataview = new DataView(event.target.value.buffer);
       const val = dataview.getUint16(2, dataview, true);
+      console.log(val);
 
       const current = new Date();
+      console.log(startDate);
       const diff = Math.floor((current - startDate) / 1000).toString();
       if (diff > 600) return;
       const prevState = data;
-      prevState[diff] = { name: diff, power: val };
-      console.log(prevState);
+      /* const prevState = initData(data); */
+      prevState[diff] = { ...prevState[diff], power: val };
+      console.log(prevState[diff]);
       setData([...prevState]);
 
       /* setBatteryLevel(val); */
     };
 
-    initConnection();
     const server = await device.gatt.connect();
 
     // Get the battery service from the Bluetooth device
