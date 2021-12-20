@@ -216,9 +216,9 @@ function App() {
         const power = dataview.getInt16(6, true);
         console.log("to set", targetPowerLevel);
 
-        // writeCharacteristic.writeValue(
-        //   powerTarget({ power: targetPowerLevel })
-        // );
+        writeCharacteristic.writeValue(
+          powerTarget({ power: targetPowerLevel })
+        );
         /* const inVal = dataview.getUint16(2, dataview, true); */
         const dt = new Date();
         setVal({
