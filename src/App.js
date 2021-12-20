@@ -178,9 +178,10 @@ function App() {
     const connectToDeviceAndSubscribeToUpdates = async () => {
       // Search for Bluetooth devices that advertise a battery service
       const device = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: "KI" }],
-        optionalServices: ["00001826-0000-1000-8000-00805f9b34fb"],
-      });
+        filters: [{
+          services: ["00001826-0000-1000-8000-00805f9b34fb"],
+          optionalServices: ["00001818-0000-1000-8000-00805f9b34fb"]}]
+        });
 
       setIsConnected(true);
 
@@ -215,9 +216,9 @@ function App() {
         const power = dataview.getInt16(6, true);
         console.log("to set", targetPowerLevel);
 
-        writeCharacteristic.writeValue(
-          powerTarget({ power: targetPowerLevel })
-        );
+        // writeCharacteristic.writeValue(
+        //   powerTarget({ power: targetPowerLevel })
+        // );
         /* const inVal = dataview.getUint16(2, dataview, true); */
         const dt = new Date();
         setVal({
@@ -239,7 +240,7 @@ function App() {
       );
 
       ////////////////////
-
+      await writeCharacteristic.startNotifications();
       await writeCharacteristic.writeValue(requestControl());
 
       /* let power = 100; */
