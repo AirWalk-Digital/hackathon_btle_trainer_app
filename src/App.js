@@ -40,11 +40,31 @@ const MyChart = ({ data }) => {
   );
 };
 
+const Main = ({ data, disconnect, start }) => {
+  return (
+    <div>
+      <MyChart data={data} />
+      <Button onClick={() => start()}>Start </Button>
+      <Button
+        onClick={() => disconnect()}
+        variant="contained"
+        startIcon={<BluetoothDisabledRoundedIcon />}
+      >
+        Disconnect
+      </Button>
+    </div>
+  );
+};
+
 function App() {
   const [supportsBluetooth, setSupportsBluetooth] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [data, setData] = useState([]);
-  const [startDate, setStartDate] = useState();
+  /* const [data, setData] = useState([]); */
+  /* const [startDate, setStartDate] = useState(); */
+  /* const [requestStart, setRequestStart] = useState(false); */
+  const [state, setState] = useState({}); //{ runState: "stopped" });
+  const [start, setStart] = useState(false);
+  const [val, setVal] = useState();
 
   // When the component mounts, check that the browser supports Bluetooth
   useEffect(() => {
@@ -60,8 +80,32 @@ function App() {
   ];
 
   useEffect(() => {
-    if (data.length != 0) return;
+    // work out which element of array needs the power data updating
+    if (state.runState !== "run") return;
+    const diff = Math.floor((val.dt - state.startDate) / 1000).toString();
 
+    // if the workout has finished stop adding data to the chart
+    if (diff >= state.data.length) return;
+
+    // otherwise set the current power in the array
+    const prevState = state;
+    const prevData = state.data;
+
+    prevData[diff] = { ...prevData[diff], power: val.val };
+    setState({ ...prevState, data: [...prevData] });
+  }, [val]);
+
+  const handleCharacteristicValueChanged = (event) => {
+    let dataview = new DataView(event.target.value.buffer);
+    const inVal = dataview.getUint16(2, dataview, true);
+    const dt = new Date();
+    setVal({ dt: dt, val: inVal });
+  };
+
+  useEffect(() => {
+    if (!start) return;
+
+    const prevState = state;
     const initData = [];
 
     // build up initial array for target power. This means we can alter existing values as actual power arrives and have them appear on the graph
@@ -73,11 +117,18 @@ function App() {
       outer = outer + p.interval;
     });
 
-    setData(initData);
     // store the current date to work out date differences for which array element to wite power data into later
     const dt = new Date();
-    setStartDate(dt);
-  }, []);
+    const newState = {
+      ...prevState,
+      data: initData,
+      startDate: dt,
+      runState: "run",
+    };
+    console.log(newState);
+    setState({ ...newState });
+    setStart(false);
+  }, [start]);
 
   const connectToDeviceAndSubscribeToUpdates = async () => {
     // Search for Bluetooth devices that advertise a battery service
@@ -90,25 +141,6 @@ function App() {
     device.addEventListener("gattserverdisconnected", () =>
       setIsConnected(false)
     );
-
-    const handleCharacteristicValueChanged = (event) => {
-      // handle incoming value from trainer
-      let dataview = new DataView(event.target.value.buffer);
-      const val = dataview.getUint16(2, dataview, true);
-
-      // work out which element of array needs the power data updating
-      const current = new Date();
-      const diff = Math.floor((current - startDate) / 1000).toString();
-
-      // if the workout has finished stop adding data to the chart
-      if (diff >= data.length) return;
-
-      // otherwise set the current power in the array
-      const prevState = data;
-      prevState[diff] = { ...prevState[diff], power: val };
-      console.log(prevState[diff]);
-      setData([...prevState]);
-    };
 
     const server = await device.gatt.connect();
 
@@ -151,16 +183,13 @@ function App() {
         </div>
       )}
       {supportsBluetooth && isConnected && (
-        <div>
-          <MyChart data={data} />
-          <Button
-            onClick={() => setIsConnected(false)}
-            variant="contained"
-            startIcon={<BluetoothDisabledRoundedIcon />}
-          >
-            Disconnect
-          </Button>
-        </div>
+        <Main
+          data={state.data}
+          disconnect={() => setIsConnected(false)}
+          start={() => {
+            setStart(true);
+          }}
+        />
       )}
     </div>
   );
