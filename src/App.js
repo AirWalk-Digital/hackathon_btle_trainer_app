@@ -15,6 +15,23 @@ import BluetoothSearchingRoundedIcon from "@mui/icons-material/BluetoothSearchin
 import BluetoothDisabledRoundedIcon from "@mui/icons-material/BluetoothDisabled";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Stack from "@mui/material/Stack";
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+
+const defaultWorkout = `[
+  {
+    "interval": 10,
+    "target": 100
+  },
+  {
+    "interval": 10,
+    "target": 200
+  },
+  {
+    "interval": 10,
+    "target": 300
+  }
+]`;
 
 let targetPowerLevel = 0;
 
@@ -28,7 +45,6 @@ function requestControl() {
 }
 
 function powerTarget(args) {
-  console.log(args);
   const OpCode = 0x05;
   const power = args.power;
 
@@ -69,25 +85,48 @@ const MyChart = ({ data }) => {
 };
 
 const Main = ({ data, disconnect, start }) => {
+  const [value, setValue] = React.useState(defaultWorkout);
+
+  const handleChange = (event) => {
+    setValue(event.target.value);
+  };
+
   return (
     <div>
       <MyChart data={data} />
-      <Stack direction="row" spacing={2}>
-        <Button
-          onClick={() => start()}
-          startIcon={<PlayArrowIcon />}
-          variant="contained"
-        >
-          Start{" "}
-        </Button>
-        <Button
-          onClick={() => disconnect()}
-          variant="contained"
-          startIcon={<BluetoothDisabledRoundedIcon />}
-        >
-          Disconnect
-        </Button>
-      </Stack>
+      <Box
+        component="form"
+        sx={{
+          "& .MuiTextField-root": { m: 1, width: "25ch" },
+        }}
+        noValidate
+        autoComplete="off"
+      >
+        <TextField
+          id="outlined-multiline-static"
+          label="Workout Config"
+          multiline
+          rows={20}
+          value={value}
+          onChange={handleChange}
+        />
+        <Stack direction="row" spacing={2}>
+          <Button
+            onClick={() => start(JSON.parse(value))}
+            startIcon={<PlayArrowIcon />}
+            variant="contained"
+          >
+            Start{" "}
+          </Button>
+          <Button
+            onClick={() => disconnect()}
+            variant="contained"
+            startIcon={<BluetoothDisabledRoundedIcon />}
+          >
+            Disconnect
+          </Button>
+        </Stack>
+      </Box>
     </div>
   );
 };
@@ -126,17 +165,7 @@ function App() {
     const prevData = state.data;
 
     prevData[diff] = { ...prevData[diff], ...val };
-    /* console.log("target", prevData[diff].target); */
     const currentTarget = prevData[diff].target;
-    console.log("setting", currentTarget);
-    /* const x = requestControl(); */
-    /* console.log(x); */
-    /* await val.targetCb(); */
-    /* let power = 100; */
-
-    /* console.log(val.cb); */
-    /* await writeCharacteristic.writeValue(powerTarget({ power })); */
-    /* await val.targetCb(powerTarget({ power })); */
     targetPowerLevel = currentTarget;
     setState({
       ...prevState,
@@ -145,14 +174,16 @@ function App() {
   }, [val]);
 
   useEffect(() => {
-    if (!start) return;
+    if (!start.flag) return;
+    console.log(start);
 
     const prevState = state;
     const initData = [];
 
+    if (start.workoutData === undefined) return;
     // build up initial array for target power. This means we can alter existing values as actual power arrives and have them appear on the graph
     let outer = 0;
-    plan.forEach((p) => {
+    start.workoutData.forEach((p) => {
       for (let i = 0; i < p.interval; i++) {
         initData[outer + i] = { name: i.toString(), target: p.target };
       }
@@ -167,9 +198,8 @@ function App() {
       startDate: dt,
       runState: "run",
     };
-    console.log(newState);
     setState({ ...newState });
-    setStart(false);
+    setStart({ flag: false });
   }, [start]);
 
   useEffect(() => {
@@ -213,7 +243,6 @@ function App() {
         const speed = dataview.getUint16(2, true) / 100;
         const cadence = dataview.getUint16(4, true) * 0.5;
         const power = dataview.getInt16(6, true);
-        console.log("to set", targetPowerLevel);
 
         writeCharacteristic.writeValue(
           powerTarget({ power: targetPowerLevel })
@@ -230,20 +259,12 @@ function App() {
       // When the battery level changes, call a function
       readCharacteristic.addEventListener(
         "characteristicvaluechanged",
-        /* (event) => */
-        /* handleCharacteristicValueChanged({ */
-        /* event: event, */
-        /* cb: writeCharacteristic.writeValue, */
-        /* }) */
         handleCharacteristicValueChanged
       );
 
       ////////////////////
 
       await writeCharacteristic.writeValue(requestControl());
-
-      /* let power = 100; */
-      /* await writeCharacteristic.writeValue(powerTarget({ power })); */
     };
     connectToDeviceAndSubscribeToUpdates();
 
@@ -252,6 +273,7 @@ function App() {
 
   return (
     <div>
+      <h1>BTLE Smart Trainer App</h1>
       {!supportsBluetooth && (
         <Alert severity="error">
           This browser doesn't support the Web Bluetooth API
@@ -275,8 +297,8 @@ function App() {
             setState({});
             setIsConnected(false);
           }}
-          start={() => {
-            setStart(true);
+          start={(workoutData) => {
+            setStart({ flag: true, workoutData });
           }}
         />
       )}
