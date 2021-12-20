@@ -15,22 +15,6 @@ import BluetoothSearchingRoundedIcon from "@mui/icons-material/BluetoothSearchin
 import BluetoothDisabledRoundedIcon from "@mui/icons-material/BluetoothDisabled";
 
 const MyChart = ({ data }) => {
-  /* useEffect(() => { */
-  /* setState([...data]); */
-  /* }, data); */
-  /* useEffect(() => {
-   *   const timer = setInterval(() => {
-   *     const current = new Date();
-   *     const diff = Math.floor((current - startDate) / 1000).toString();
-   *     if (diff > 600) return;
-   *     const r = Math.floor(Math.random() * 101);
-   *     const prevState = state;
-   *     prevState[diff] = { name: diff, power: r };
-   *     setState([...prevState]);
-   *   }, 1000);
-   *   return () => clearInterval(timer);
-   * }, []);
-   */
   return (
     <ResponsiveContainer height={"100%"} width={"100%"} aspect={3}>
       <LineChart
@@ -62,18 +46,6 @@ function App() {
   const [data, setData] = useState([]);
   const [startDate, setStartDate] = useState();
 
-  const initData = (inData) => {
-    /* console.log(inData); */
-    /* if (inData.length > 0) return inData; */
-    const initData = [];
-    for (let i = 0; i < 600; i++) {
-      initData[i] = { name: i.toString() };
-    }
-    return initData;
-    /* setData(initData); */
-    /* setIsConnected(true); */
-  };
-
   // When the component mounts, check that the browser supports Bluetooth
   useEffect(() => {
     if (navigator.bluetooth) {
@@ -92,6 +64,7 @@ function App() {
 
     const initData = [];
 
+    // build up initial array for target power. This means we can alter existing values as actual power arrives and have them appear on the graph
     let outer = 0;
     plan.forEach((p) => {
       for (let i = 0; i < p.interval; i++) {
@@ -100,48 +73,41 @@ function App() {
       outer = outer + p.interval;
     });
 
-    console.log(initData);
-    /* for (let i = 0; i < 600; i++) { */
-    /* initData[i] = { name: i.toString() }; */
-    /* } */
-    const dt = new Date();
     setData(initData);
+    // store the current date to work out date differences for which array element to wite power data into later
+    const dt = new Date();
     setStartDate(dt);
   }, []);
 
   const connectToDeviceAndSubscribeToUpdates = async () => {
-    /* try { */
     // Search for Bluetooth devices that advertise a battery service
     const device = await navigator.bluetooth.requestDevice({
-      /* filters: [{ namePrefix: "KI" }], */
-      /* optionalServices: ["00001818-0000-1000-8000-00805f9b34fb"], */
       filters: [{ services: ["00001818-0000-1000-8000-00805f9b34fb"] }],
-      //{ services: ["battery_service", "cycling_power"] }],
     });
 
     setIsConnected(true);
-    /* initConnection(); */
 
     device.addEventListener("gattserverdisconnected", () =>
       setIsConnected(false)
     );
 
     const handleCharacteristicValueChanged = (event) => {
+      // handle incoming value from trainer
       let dataview = new DataView(event.target.value.buffer);
       const val = dataview.getUint16(2, dataview, true);
-      console.log(val);
 
+      // work out which element of array needs the power data updating
       const current = new Date();
-      console.log(startDate);
       const diff = Math.floor((current - startDate) / 1000).toString();
-      if (diff > 600) return;
+
+      // if the workout has finished stop adding data to the chart
+      if (diff >= data.length) return;
+
+      // otherwise set the current power in the array
       const prevState = data;
-      /* const prevState = initData(data); */
       prevState[diff] = { ...prevState[diff], power: val };
       console.log(prevState[diff]);
       setData([...prevState]);
-
-      /* setBatteryLevel(val); */
     };
 
     const server = await device.gatt.connect();
@@ -150,8 +116,6 @@ function App() {
     const service = await server.getPrimaryService(
       "00001818-0000-1000-8000-00805f9b34fb"
     );
-    /* const chars = await service.getCharacteristics(); */
-    /* console.log(chars); */
 
     // Get the battery level characteristic from the Bluetooth device
     const characteristic = await service.getCharacteristic(
