@@ -45,6 +45,10 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [data, setData] = useState([]);
   const [startDate, setStartDate] = useState();
+  const [targetPowerLevel, setTargetPowerLevel] = useState(null);
+  const [speed, setSpeed] = useState(null);
+  const [cadence, setCadence] = useState(null);
+  const [power, setPower] = useState(null);
 
   // When the component mounts, check that the browser supports Bluetooth
   useEffect(() => {
@@ -82,7 +86,7 @@ function App() {
   const connectToDeviceAndSubscribeToUpdates = async () => {
     // Search for Bluetooth devices that advertise a battery service
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ["00001818-0000-1000-8000-00805f9b34fb"] }],
+      filters: [{ services: ["00001826-0000-1000-8000-00805f9b34fb"] }],
     });
 
     setIsConnected(true);
@@ -94,7 +98,7 @@ function App() {
     const handleCharacteristicValueChanged = (event) => {
       // handle incoming value from trainer
       let dataview = new DataView(event.target.value.buffer);
-      const val = dataview.getUint16(2, dataview, true);
+      const val = dataview.getInt16(6, true);
 
       // work out which element of array needs the power data updating
       const current = new Date();
@@ -108,18 +112,25 @@ function App() {
       prevState[diff] = { ...prevState[diff], power: val };
       console.log(prevState[diff]);
       setData([...prevState]);
+      console.log(prevState[diff]['target']);
+      let powertoset = prevState[diff]['target'];
+      characteristic.writeValue(powerTarget({powertoset}));
+      setTargetPowerLevel(powertoset);
+      setSpeed(dataview.getUint16(2, true) / 100);
+      setCadence(dataview.getUint16(4, true) * 0.5);
+      setPower(dataview.getInt16(6, true));
     };
 
     const server = await device.gatt.connect();
 
     // Get the battery service from the Bluetooth device
     const service = await server.getPrimaryService(
-      "00001818-0000-1000-8000-00805f9b34fb"
+      "00001826-0000-1000-8000-00805f9b34fb"
     );
 
     // Get the battery level characteristic from the Bluetooth device
     const characteristic = await service.getCharacteristic(
-      "00002a63-0000-1000-8000-00805f9b34fb"
+      "00002ad9-0000-1000-8000-00805f9b34fb"
     );
 
     // Subscribe to battery level notifications
@@ -130,6 +141,48 @@ function App() {
       "characteristicvaluechanged",
       handleCharacteristicValueChanged
     );
+
+    // get the 'Indoor Bike Data' characteristic which contains the features the device exposes
+    const characteristicIndoorBikeData = await service.getCharacteristic(
+      "00002ad2-0000-1000-8000-00805f9b34fb"
+    );
+
+    await characteristicIndoorBikeData.startNotifications();
+    characteristicIndoorBikeData.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+
+    function requestControl() {
+      const OpCode = 0x00;
+      let buffer   = new ArrayBuffer(1);
+      let view     = new DataView(buffer);
+      view.setUint8(0, OpCode, true);
+
+      return view;
+    }
+
+    function powerTarget(args) {
+        const OpCode = 0x05;
+        const power = args.power;
+
+        const buffer = new ArrayBuffer(3);
+        const view   = new DataView(buffer);
+        view.setUint8( 0, OpCode, true);
+        view.setUint16(1, power,  true);
+
+        return view;
+    }
+
+    await characteristic.startNotifications();
+
+    const handleCharacteristicValueChangedTargetPower = (event) => {
+      console.log(event);
+    };
+
+    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChangedTargetPower);
+    await characteristic.writeValue(requestControl());
+    let power = 100;
+    setTargetPowerLevel(power);
+    await characteristic.writeValue(powerTarget({power}));
+
   };
 
   return (
@@ -149,6 +202,24 @@ function App() {
             Connect
           </Button>
         </div>
+      )}
+      {supportsBluetooth && isConnected && (
+      <table>
+      <tr>
+        <th>Speed</th>
+        <th>Cadence</th>
+        <th>Current Power</th>
+        <th> ---------- </th>
+        <th>Target Power</th>
+      </tr>
+        <tr>
+          <td>{speed}</td>
+          <td>{cadence}</td>
+          <td>{power}</td>
+          <td>              </td>
+          <td>{targetPowerLevel}</td>
+        </tr>
+      </table>
       )}
       {supportsBluetooth && isConnected && (
         <div>
