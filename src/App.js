@@ -37,6 +37,8 @@ const MyChart = ({ data }) => {
         <Legend />
         <Line type="monotone" dataKey="power" stroke="red" strokeWidth={3} />
         <Line type="monotone" dataKey="target" stroke="green" strokeWidth={3} />
+        <Line type="monotone" dataKey="cadence" stroke="blue" strokeWidth={1} />
+        <Line type="monotone" dataKey="speed" stroke="orange" strokeWidth={1} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -69,9 +71,6 @@ const Main = ({ data, disconnect, start }) => {
 function App() {
   const [supportsBluetooth, setSupportsBluetooth] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  /* const [data, setData] = useState([]); */
-  /* const [startDate, setStartDate] = useState(); */
-  /* const [requestStart, setRequestStart] = useState(false); */
   const [state, setState] = useState({}); //{ runState: "stopped" });
   const [start, setStart] = useState(false);
   const [val, setVal] = useState();
@@ -101,15 +100,20 @@ function App() {
     const prevState = state;
     const prevData = state.data;
 
-    prevData[diff] = { ...prevData[diff], power: val.val };
+    prevData[diff] = { ...prevData[diff], ...val };
     setState({ ...prevState, data: [...prevData] });
   }, [val]);
 
   const handleCharacteristicValueChanged = (event) => {
     let dataview = new DataView(event.target.value.buffer);
-    const inVal = dataview.getUint16(2, dataview, true);
+
+    const speed = dataview.getUint16(2, true) / 100;
+    const cadence = dataview.getUint16(4, true) * 0.5;
+    const power = dataview.getInt16(6, true);
+
+    /* const inVal = dataview.getUint16(2, dataview, true); */
     const dt = new Date();
-    setVal({ dt: dt, val: inVal });
+    setVal({ dt: dt, power, speed, cadence });
   };
 
   useEffect(() => {
@@ -143,7 +147,8 @@ function App() {
   const connectToDeviceAndSubscribeToUpdates = async () => {
     // Search for Bluetooth devices that advertise a battery service
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: ["00001818-0000-1000-8000-00805f9b34fb"] }],
+      filters: [{ namePrefix: "KI" }],
+      optionalServices: ["00001826-0000-1000-8000-00805f9b34fb"],
     });
 
     setIsConnected(true);
@@ -156,12 +161,12 @@ function App() {
 
     // Get the battery service from the Bluetooth device
     const service = await server.getPrimaryService(
-      "00001818-0000-1000-8000-00805f9b34fb"
+      "00001826-0000-1000-8000-00805f9b34fb"
     );
 
     // Get the battery level characteristic from the Bluetooth device
     const characteristic = await service.getCharacteristic(
-      "00002a63-0000-1000-8000-00805f9b34fb"
+      "00002ad2-0000-1000-8000-00805f9b34fb"
     );
 
     // Subscribe to battery level notifications
